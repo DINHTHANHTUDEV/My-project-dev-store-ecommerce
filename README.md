@@ -285,8 +285,3 @@ If you want to help us, choose an approved issue and implement it.
 
 See the project running on <a href="https://devstore.academy" target="_blank">DevStore official instance</a>
 
-## About
-
-DevStore was proudly developed by [desenvolvedor.io](https://desenvolvedor.io/)
-❤<img alt="Brasil" src="https://user-images.githubusercontent.com/5068797/161345649-c7184fdc-2bc3-42a9-8fb6-6ffee9c8f9c2.png" width="20" height="14" />
-team under the [MIT license](LICENSE).
