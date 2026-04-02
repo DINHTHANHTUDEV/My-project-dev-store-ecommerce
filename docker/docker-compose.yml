@@ -1,0 +1,156 @@
+name: devstore
+
+x-common-variables: &common-variables
+    ASPNETCORE_ENVIRONMENT: Docker
+    ASPNETCORE_URLS: https://+:443;http://+:80
+    ASPNETCORE_Kestrel__Certificates__Default__Password: 9HoGMnb7Lu8NFdHBz4Vq2rtKivzMhmMXhtvuB4TZcLMmbWfFmDQCjJeLURAJ4GYe
+    ASPNETCORE_Kestrel__Certificates__Default__Path: /https/devstore.academy-localhost.pfx
+    AppSettings__DatabaseType: SqlServer
+    MessageQueueConnection__MessageBus: host=rabbitmq:5672;publisherConfirms=true;timeout=30;username=devstore;password=devstore
+
+include:
+    - docker-common-resources.yml
+
+services:
+
+    api-identity:
+        image: desenvolvedorio/devstore-api-identity:latest
+        container_name: devstore-api-identity
+        restart: always
+        environment:            
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSUsers;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            generate-pfx:
+                condition: service_completed_successfully
+            database:
+                condition: service_healthy
+            logging:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+
+    api-cart:
+        image: desenvolvedorio/devstore-api-cart:latest
+        container_name: devstore-api-cart
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSShoppingCart;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            api-identity:
+                condition: service_started
+
+    api-catalog:
+        image: desenvolvedorio/devstore-api-catalog:latest
+        container_name: devstore-api-catalog
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSCatalog;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            api-identity:
+                condition: service_started
+
+    api-customers:
+        image: desenvolvedorio/devstore-api-customers:latest
+        container_name: devstore-api-customers
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSCustomers;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            api-identity:
+                condition: service_started
+
+    api-order:
+        image: desenvolvedorio/devstore-api-order:latest
+        container_name: devstore-api-order
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSOrders;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+            Logging__Console__FormatterName: ""
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            api-identity:
+                condition: service_started
+
+    api-billing:
+        image: desenvolvedorio/devstore-api-billing:latest
+        container_name: devstore-api-billing
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSBilling;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            api-identity:
+                condition: service_started
+            api-order:
+                condition: service_started
+    
+    api-bff-checkout:
+        image: desenvolvedorio/devstore-api-bff-checkout:latest
+        container_name: devstore-api-bff-checkout
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSStatus;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+        depends_on:
+            - api-identity
+            - api-cart
+            - api-billing
+            - api-order
+    
+    web-mvc:
+        image: desenvolvedorio/devstore-web-mvc-ecommerce:latest
+        container_name: devstore-web-mvc-ecommerce
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSStatus;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+            LC_ALL: "en_US.UTF-8"
+            LANG: "en_US.UTF-8"
+            # Change the two lines above to your culture (ex pt_BR)
+            USE_HTTPS_REDIRECTION: "false"
+        expose:
+            - 80
+            - 443
+        volumes:
+            - ./certs:/https:ro
+            - dpkeys:/var/data_protection_keys/
+        depends_on:
+            - api-catalog
+            - api-identity
+            - api-customers
+            - api-bff-checkout
+    
+    web-status:
+        image: desenvolvedorio/devstore-web-status:latest
+        container_name: devstore-web-status
+        restart: always
+        environment:
+            <<: *common-variables
+            CUSTOMCONNSTR_DefaultConnection: "Server=database;Database=DSStatus;MultipleActiveResultSets=true;User Id=sa;Password=MyDB@123;MultipleActiveResultSets=true;TrustServerCertificate=True;"
+        volumes:
+            - ./certs:/https:ro
+            - ./certs/devstore.crt:/usr/local/share/ca-certificates/devstore.crt
+        depends_on:
+            - web-mvc   
+
+volumes:
+    dpkeys:
+    nginx-certs:
